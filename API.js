@@ -1,32 +1,39 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
+const { MongoClient } = require("mongodb");
 
 const app = express();
 app.use(cors());
 
-const csvFiles = ["Polar1.csv", "Polar2.csv"];
+const uri =
+  "mongodb+srv://polar_project_database:polar_project_database@cluster0.mec6yfh.mongodb.net/?retryWrites=true&w=majority";
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
-const data = {};
-
-for (const csvFile of csvFiles) {
-  if (!fs.existsSync(csvFile)) {
-    console.error(`File not found: ${csvFile}`);
-    continue;
+async function fetchData(collectionName, fileId) {
+  try {
+    await client.connect();
+    const collection = client.db("database1").collection(collectionName);
+    const cursor = collection.find({ file_id: fileId });
+    const data = await cursor.toArray();
+    return data.map((d) => d.data); // only return the "data" field
+  } finally {
+    await client.close();
   }
-
-  const csvData = fs.readFileSync(csvFile, "utf-8");
-  data[csvFile] = csvData;
 }
 
-app.get("/:csvNumber", (req, res) => {
-  const csvNumber = req.params.csvNumber;
-  if (csvNumber < 1 || csvNumber > csvFiles.length) {
-    res.status(404).send(`CSV number ${csvNumber} not found`);
-    return;
+app.get("/:collectionName/:fileId", async (req, res) => {
+  try {
+    const collectionName = req.params.collectionName;
+    const fileId = req.params.fileId;
+    const data = await fetchData(collectionName, fileId);
+    res.send(data.join("\n")); // send "data" as plain text
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Internal server error");
   }
-  const csvFile = csvFiles[csvNumber - 1];
-  res.type("text/plain").send(data[csvFile]);
 });
 
 app.listen(3001, () => {
