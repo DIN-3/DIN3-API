@@ -1,3 +1,5 @@
+// Local host test file for API
+
 const express = require("express");
 const cors = require("cors");
 const { MongoClient } = require("mongodb");
@@ -7,7 +9,8 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3001;
 
-const uri = process.env.MONGODB_URI;
+const uri =
+  "mongodb+srv://polar_project_database:polar_project_database@cluster0.mec6yfh.mongodb.net/?retryWrites=true&w=majority";
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,

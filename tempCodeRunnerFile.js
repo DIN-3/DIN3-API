@@ -24,54 +24,10 @@ async function fetchData(collectionName, fileId) {
   if (!collection) {
     await connect(collectionName);
   }
-  if (!collection) {
-    throw new Error("Failed to connect to database");
-  }
   const cursor = collection.find({ file_id: fileId });
   const data = await cursor.toArray();
   return data.map((d) => d.data);
 }
-
-app.get("/", async (req, res) => {
-  try {
-    res.send(
-      `<ul>
-        <li><a href="/Hurdles">Hurdles</a></li>
-        <li><a href="/Sprint">Sprint</a></li>
-        <li><a href="/Pole_vault">Pole Vault</a></li>
-      </ul>
-    `
-    );
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Internal server error");
-  }
-});
-
-app.get("/:collectionName", async (req, res) => {
-  try {
-    const collectionName = req.params.collectionName;
-    await connect(collectionName);
-    const cursor = collection.find();
-    const data = await cursor.toArray();
-    const files = data
-      .map(
-        (d) => `
-      <li><a href="/${collectionName}/${d.file_id}">${d.file_id}</a></li>
-    `
-      )
-      .join("");
-    res.send(`
-      <h1>${collectionName}</h1>
-      <ul>
-        ${files}
-      </ul>
-    `);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Internal server error");
-  }
-});
 
 app.get("/:collectionName/:fileId", async (req, res) => {
   try {
