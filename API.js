@@ -8,25 +8,25 @@ app.use(cors());
 const PORT = process.env.PORT || 3001;
 
 const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
 
-let collection;
+async function connectToDatabase(req, res, next) {
+  const client = new MongoClient(uri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 
-async function connect(collectionName) {
-  await client.connect();
-  collection = client.db("database1").collection(collectionName);
-}
-
-async function fetchData(collectionName, fileId) {
-  if (!collection) {
-    await connect(collectionName);
-  }
-  if (!collection) {
+  try {
+    await client.connect();
+    req.dbClient = client;
+    next();
+  } catch (error) {
+    console.error(error);
     throw new Error("Failed to connect to database");
   }
+}
+
+async function fetchData(collectionName, fileId, dbClient) {
+  const collection = dbClient.db("database1").collection(collectionName);
   const cursor = collection.find({ file_id: fileId });
   const data = await cursor.toArray();
   return data.map((d) => d.data);
@@ -48,10 +48,10 @@ app.get("/", async (req, res) => {
   }
 });
 
-app.get("/:collectionName", async (req, res) => {
+app.get("/:collectionName", connectToDatabase, async (req, res) => {
   try {
     const collectionName = req.params.collectionName;
-    await connect(collectionName);
+    const collection = req.dbClient.db("database1").collection(collectionName);
     const cursor = collection.find();
     const data = await cursor.toArray();
     const files = data
@@ -73,11 +73,12 @@ app.get("/:collectionName", async (req, res) => {
   }
 });
 
-app.get("/:collectionName/:fileId", async (req, res) => {
+app.get("/:collectionName/:fileId", connectToDatabase, async (req, res) => {
   try {
     const collectionName = req.params.collectionName;
     const fileId = req.params.fileId;
-    const data = await fetchData(collectionName, fileId);
+    const dbClient = req.dbClient;
+    const data = await fetchData(collectionName, fileId, dbClient);
     res.send(data.join("\n")); // send "data" as plain text
   } catch (error) {
     console.error(error);
