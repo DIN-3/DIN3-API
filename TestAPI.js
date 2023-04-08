@@ -51,16 +51,17 @@ app.get("/", async (req, res) => {
   }
 });
 
-app.get("/:collectionName", async (req, res) => {
+app.get("/:collectionName", connectToDatabase, async (req, res) => {
   try {
     const collectionName = req.params.collectionName;
-    await connect(collectionName);
+    const collection = req.dbClient.db("database1").collection(collectionName);
     const cursor = collection.find();
     const data = await cursor.toArray();
     const files = data
       .map(
         (d) => `
       <li><a href="/${collectionName}/${d.file_id}">${d.file_id}</a></li>
+      <pre>${JSON.stringify(d.data, null, 2)}</pre>
     `
       )
       .join("");

@@ -54,18 +54,37 @@ app.get("/:collectionName", connectToDatabase, async (req, res) => {
     const collection = req.dbClient.db("database1").collection(collectionName);
     const cursor = collection.find();
     const data = await cursor.toArray();
-    const files = data
-      .map(
-        (d) => `
-      <li><a href="/${collectionName}/${d.file_id}">${d.file_id}</a></li>
-    `
-      )
-      .join("");
+    const files = await Promise.all(
+      data.map(async (d) => {
+        const fileData = await fetchData(
+          collectionName,
+          d.file_id,
+          req.dbClient
+        );
+        return `
+          <li><a href="/${collectionName}/${d.file_id}">${d.file_id}</a></li>
+        `;
+      })
+    );
+    const dataOutput = await Promise.all(
+      data.map(async (d) => {
+        const fileData = await fetchData(
+          collectionName,
+          d.file_id,
+          req.dbClient
+        );
+        return `
+          <h2>${d.file_id}</h2>
+          <pre>${fileData.join("\n")}</pre>
+        `;
+      })
+    );
     res.send(`
       <h1>${collectionName}</h1>
       <ul>
-        ${files}
+        ${files.join("")}
       </ul>
+      ${dataOutput.join("")}
     `);
   } catch (error) {
     console.error(error);
