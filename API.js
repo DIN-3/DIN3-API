@@ -9,29 +9,29 @@ const PORT = process.env.PORT || 3001;
 
 const uri = process.env.MONGODB_URI;
 
-async function connectToDatabase(req, res, next) {
-  const client = new MongoClient(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  maxPoolSize: 100,
+});
 
+async function connectToDatabase(req, res, next) {
   try {
     await client.connect();
-    req.dbClient = client;
+    req.db = client.db("database1");
     next();
   } catch (error) {
     console.error(error);
-    throw new Error("Failed to connect to database");
+    res.status(500).send("Internal server error");
   }
 }
 
-async function fetchData(collectionName, fileId, dbClient) {
-  const collection = dbClient.db("database1").collection(collectionName);
+async function fetchData(collectionName, fileId, db) {
+  const collection = db.collection(collectionName);
   const cursor = collection.find({ file_id: fileId });
   const data = await cursor.toArray();
   return data.map((d) => d.data);
 }
-
 app.get("/", async (req, res) => {
   try {
     res.send(
@@ -51,31 +51,13 @@ app.get("/", async (req, res) => {
 app.get("/:collectionName", connectToDatabase, async (req, res) => {
   try {
     const collectionName = req.params.collectionName;
-    const collection = req.dbClient.db("database1").collection(collectionName);
+    const collection = req.db.collection(collectionName);
     const cursor = collection.find();
     const data = await cursor.toArray();
     const files = await Promise.all(
       data.map(async (d) => {
-        const fileData = await fetchData(
-          collectionName,
-          d.file_id,
-          req.dbClient
-        );
         return `
           <li><a href="/${collectionName}/${d.file_id}">${d.file_id}</a></li>
-        `;
-      })
-    );
-    const dataOutput = await Promise.all(
-      data.map(async (d) => {
-        const fileData = await fetchData(
-          collectionName,
-          d.file_id,
-          req.dbClient
-        );
-        return `
-          <h2>${d.file_id}</h2>
-          <pre>${fileData.join("\n")}</pre>
         `;
       })
     );
@@ -84,7 +66,6 @@ app.get("/:collectionName", connectToDatabase, async (req, res) => {
       <ul>
         ${files.join("")}
       </ul>
-      ${dataOutput.join("")}
     `);
   } catch (error) {
     console.error(error);
@@ -96,8 +77,12 @@ app.get("/:collectionName/:fileId", connectToDatabase, async (req, res) => {
   try {
     const collectionName = req.params.collectionName;
     const fileId = req.params.fileId;
-    const dbClient = req.dbClient;
-    const data = await fetchData(collectionName, fileId, dbClient);
+    req.db;
+    const data = await fetchData(
+      collectionName,
+      fileId,
+      client.db("database1")
+    );
     res.send(data.join("\n")); // send "data" as plain text
   } catch (error) {
     console.error(error);
